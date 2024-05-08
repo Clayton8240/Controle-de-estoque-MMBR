@@ -1,0 +1,312 @@
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+import os
+from datetime import datetime
+import sqlite3
+
+class EstoqueApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Controle de Estoque")
+        
+        # Conexão com o banco de dados SQLite
+        self.conexao = sqlite3.connect("estoque.db")
+        self.criar_tabela_estoque()
+        
+        # Criar a interface gráfica
+        self.criar_interface()
+
+    def criar_tabela_estoque(self):
+        # Criar tabela se não existir
+        self.conexao.execute("""
+            CREATE TABLE IF NOT EXISTS estoque (
+                id INTEGER PRIMARY KEY,
+                lado TEXT NOT NULL,
+                andar TEXT NOT NULL,
+                coluna TEXT NOT NULL,
+                vaga TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                quantidade INTEGER NOT NULL,
+                usuario TEXT NOT NULL
+            )
+        """)
+        self.conexao.commit()
+
+    def criar_interface(self):
+        # Frame principal
+        self.frame_principal = ttk.Frame(self.root, padding="10")
+        self.frame_principal.grid(row=0, column=0)
+        
+        # Labels e combobox para selecionar a posição do estoque
+        ttk.Label(self.frame_principal, text="Lado:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.combo_lado = ttk.Combobox(self.frame_principal, values=['Direito', 'Esquerdo'])
+        self.combo_lado.grid(row=0, column=1, padx=5, pady=5)
+        
+        ttk.Label(self.frame_principal, text="Andar:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.combo_andar = ttk.Combobox(self.frame_principal, values=['A', 'B', 'C', 'D', 'E', 'F', 'G'])
+        self.combo_andar.grid(row=1, column=1, padx=5, pady=5)
+        
+        ttk.Label(self.frame_principal, text="Coluna:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        self.combo_coluna = ttk.Combobox(self.frame_principal, values=['1', '2', '3', '4', '5', '6', '7'])
+        self.combo_coluna.grid(row=2, column=1, padx=5, pady=5)
+
+        ttk.Label(self.frame_principal, text="Vaga:").grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        self.combo_vaga = ttk.Combobox(self.frame_principal, values=['Vaga 1', 'Vaga 2'])
+        self.combo_vaga.grid(row=3, column=1, padx=5, pady=5)
+        
+        # Labels e combobox para selecionar o tipo de material
+        ttk.Label(self.frame_principal, text="Tipo de Material:").grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        self.combo_tipo_material = ttk.Combobox(self.frame_principal, values=[
+            "ADESIVO BRILHO", "AMOSTRA", "ARAME MIRUNA", "BOIUI", "BOX ACRILICO", "BOX VOLVO",
+            "CAIXA", "CAIXA EXP M", "CAIXA G", "CAIXA G+", "CAIXA G", "CAIXA M", "CAIXA P",
+            "COUCHE BRILHO 115G 64X88", "COUCHE BRILHO 115G 66X96", "COUCHE BRILHO 150G 64X88",
+            "COUCHE BRILHO 150G 66X96", "COUCHE BRILHO 170G 64X88", "COUCHE BRILHO 210G 66X96",
+            "COUCHE BRILHO 250G 66X96", "COUCHE BRILHO 300G 66X96", "COUCHE BRILHO 90G 64X88",
+            "COUCHE FSC BRILHO 210G 66X96", "DUO DESIGN 300G 66X96", "DUPLEX 250G 77X113",
+            "DUPLEX 300G 66X96", "DVD BOX PRETO", "ECOPRESS 70G 64X96", "ENV BOLHA 19X25",
+            "ENVELOPE CD RECICLATO", "FICHARIO", "LAMINAS", "PAPEL CANARIO", "PAPEIS FSC",
+            "PASTA GBW", "RECICLATO 120G 66X96", "RECICLATO 180G 66X96", "RECICLATO 75G 64X88",
+            "RECICLATO 75G 66X96", "RECICLATO 75G 76X1120", "RECICLATO 90G 64X88", "RECICLATO 90G 66X96",
+            "SHIRINK", "SUPREMO 250G 66X96", "SUPREMO 250G 77X1130", "SUPREMO 300G 66X96", "SUPERB VERDE/ AMARELO"
+        ])
+        self.combo_tipo_material.grid(row=4, column=1, padx=5, pady=5)
+        
+        # Labels e entry para inserir informações sobre a quantidade
+        ttk.Label(self.frame_principal, text="Quantidade:").grid(row=5, column=0, padx=5, pady=5, sticky="e")
+        self.entry_quantidade = ttk.Entry(self.frame_principal)
+        self.entry_quantidade.grid(row=5, column=1, padx=5, pady=5)
+
+        # Label e combobox para selecionar o usuário
+        ttk.Label(self.frame_principal, text="Usuário:").grid(row=6, column=0, padx=5, pady=5, sticky="e")
+        self.combo_usuario = ttk.Combobox(self.frame_principal, values=["Aline", "Bruno", "Lucas", "Paulo"])
+        self.combo_usuario.grid(row=6, column=1, padx=5, pady=5)
+        
+        # Botões para adicionar e retirar produtos
+        self.botao_adicionar = ttk.Button(self.frame_principal, text="Adicionar Produto", command=self.adicionar_produto)
+        self.botao_adicionar.grid(row=7, column=0, columnspan=2, pady=5)
+        
+        self.botao_retirar = ttk.Button(self.frame_principal, text="Retirar Produto", command=self.retirar_produto)
+        self.botao_retirar.grid(row=8, column=0, columnspan=2, pady=5)
+        
+        # Botão para abrir página de visualização de produtos
+        self.botao_visualizar = ttk.Button(self.frame_principal, text="Visualizar Produtos", command=self.visualizar_produtos)
+        self.botao_visualizar.grid(row=9, column=0, columnspan=2, pady=5)
+        
+        # Botão para gerar relatório
+        self.botao_relatorio = ttk.Button(self.frame_principal, text="Gerar Relatório", command=self.gerar_relatorio)
+        self.botao_relatorio.grid(row=10, column=0, columnspan=2, pady=5)
+        
+        # Botão para abrir janela de pesquisa por tipo de produto
+        self.botao_pesquisar_tipo = ttk.Button(self.frame_principal, text="Pesquisar por Tipo", command=self.janela_pesquisa_tipo)
+        self.botao_pesquisar_tipo.grid(row=11, column=0, columnspan=2, pady=5)
+        
+    def adicionar_produto(self):
+        if not self.validar_entrada():
+            return
+        
+        lado = self.combo_lado.get()
+        andar = self.combo_andar.get()
+        coluna = self.combo_coluna.get()
+        vaga = self.combo_vaga.get()
+        tipo = self.combo_tipo_material.get()
+        quantidade = int(self.entry_quantidade.get())
+        usuario = self.combo_usuario.get()  # Novo campo
+
+        try:
+            # Inserir dados no banco de dados
+            self.conexao.execute("""
+                INSERT INTO estoque (lado, andar, coluna, vaga, tipo, quantidade, usuario)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (lado, andar, coluna, vaga, tipo, quantidade, usuario))
+            self.conexao.commit()
+            
+            # Registrar ação no log
+            self.registrar_log(f"Produto adicionado ao estoque:\nLado: {lado}\nAndar: {andar}\nColuna: {coluna}\nVaga: {vaga}\nTipo: {tipo}\nQuantidade: {quantidade}\nUsuário: {usuario}")
+            
+            messagebox.showinfo("Sucesso", "Produto adicionado ao estoque!")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao adicionar produto: {e}")
+
+    def retirar_produto(self):
+        if not self.validar_entrada():
+            return
+        
+        lado = self.combo_lado.get()
+        andar = self.combo_andar.get()
+        coluna = self.combo_coluna.get()
+        vaga = self.combo_vaga.get()
+        quantidade = int(self.entry_quantidade.get())
+
+        try:
+            # Verificar se há produtos suficientes para retirar
+            cursor = self.conexao.execute("""
+                SELECT quantidade FROM estoque
+                WHERE lado = ? AND andar = ? AND coluna = ? AND vaga = ?
+            """, (lado, andar, coluna, vaga))
+            resultado = cursor.fetchone()
+            if resultado is None or quantidade > resultado[0]:
+                messagebox.showwarning("Aviso", "Quantidade a retirar maior que a quantidade em estoque!")
+                return
+
+            # Atualizar quantidade no banco de dados
+            nova_quantidade = resultado[0] - quantidade
+            self.conexao.execute("""
+                UPDATE estoque SET quantidade = ?
+                WHERE lado = ? AND andar = ? AND coluna = ? AND vaga = ?
+            """, (nova_quantidade, lado, andar, coluna, vaga))
+            self.conexao.commit()
+
+            # Limpar campo de quantidade
+            self.entry_quantidade.delete(0, tk.END)
+            
+            # Registrar ação no log
+            self.registrar_log(f"Produto retirado do estoque:\nLado: {lado}\nAndar: {andar}\nColuna: {coluna}\nVaga: {vaga}\nQuantidade: {quantidade}")
+            
+            messagebox.showinfo("Sucesso", "Produto retirado do estoque!")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao retirar produto: {e}")
+
+    def validar_entrada(self):
+        if not all([
+            self.combo_lado.get(), self.combo_andar.get(), self.combo_coluna.get(),
+            self.combo_vaga.get(), self.combo_tipo_material.get(), self.entry_quantidade.get()
+        ]):
+            messagebox.showerror("Erro", "Por favor, preencha todos os campos.")
+            return False
+        return True
+    
+    def registrar_log(self, mensagem):
+        # Criar diretório se não existir
+        diretorio = "C:/Controle de estoque 1.2"
+        if not os.path.exists(diretorio):
+            os.makedirs(diretorio)
+        
+        # Criar nome do arquivo de log
+        nome_arquivo = "log_estoque.txt"
+        caminho_arquivo = os.path.join(diretorio, nome_arquivo)
+        
+        # Escrever log no arquivo
+        with open(caminho_arquivo, 'a') as arquivo:  # Modificado para 'a'
+            arquivo.write(f"\n[{datetime.now()}] {mensagem}")
+    
+    def visualizar_produtos(self):
+        # Criar uma nova janela para mostrar os produtos
+        janela_produtos = tk.Toplevel(self.root)
+        janela_produtos.title("Produtos Cadastrados")
+        
+        # Frame para os produtos
+        frame_produtos = ttk.Frame(janela_produtos, padding="10")
+        frame_produtos.grid(row=0, column=0)
+        
+        # Label para os produtos
+        ttk.Label(frame_produtos, text="Produtos Cadastrados").grid(row=0, column=0, columnspan=2, pady=5)
+        
+        # Lista de produtos
+        ttk.Label(frame_produtos, text="Lado").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(frame_produtos, text="Andar").grid(row=1, column=1, padx=5, pady=5)
+        ttk.Label(frame_produtos, text="Coluna").grid(row=1, column=2, padx=5, pady=5)
+        ttk.Label(frame_produtos, text="Vaga").grid(row=1, column=3, padx=5, pady=5)
+        ttk.Label(frame_produtos, text="Tipo").grid(row=1, column=4, padx=5, pady=5)
+        ttk.Label(frame_produtos, text="Quantidade").grid(row=1, column=5, padx=5, pady=5)
+        ttk.Label(frame_produtos, text="Usuário").grid(row=1, column=6, padx=5, pady=5)
+        
+        # Preencher lista de produtos
+        cursor = self.conexao.execute("SELECT * FROM estoque")
+        linha = 2
+        for produto in cursor:
+            ttk.Label(frame_produtos, text=produto[1]).grid(row=linha, column=0)
+            ttk.Label(frame_produtos, text=produto[2]).grid(row=linha, column=1)
+            ttk.Label(frame_produtos, text=produto[3]).grid(row=linha, column=2)
+            ttk.Label(frame_produtos, text=produto[4]).grid(row=linha, column=3)
+            ttk.Label(frame_produtos, text=produto[5]).grid(row=linha, column=4)
+            ttk.Label(frame_produtos, text=produto[6]).grid(row=linha, column=5)
+            ttk.Label(frame_produtos, text=produto[7]).grid(row=linha, column=6)
+            linha += 1
+        
+    def gerar_relatorio(self):
+        # Gerar relatório em arquivo de texto
+        relatorio = "Relatório de Estoque:\n\n"
+        cursor = self.conexao.execute("SELECT * FROM estoque")
+        for produto in cursor:
+            relatorio += f"Lado: {produto[1]}\nAndar: {produto[2]}\nColuna: {produto[3]}\nVaga: {produto[4]}\nTipo: {produto[5]}\nQuantidade: {produto[6]}\nUsuário: {produto[7]}\n\n"
+
+        # Salvar relatório em arquivo
+        nome_arquivo = "relatorio_estoque.txt"
+        caminho_arquivo = os.path.join("C:/Controle de estoque 1.2", nome_arquivo)
+        with open(caminho_arquivo, 'w') as arquivo:
+            arquivo.write(relatorio)
+        
+        messagebox.showinfo("Sucesso", "Relatório de estoque gerado com sucesso!")
+
+    def janela_pesquisa_tipo(self):
+        # Criar nova janela para pesquisa por tipo de produto
+        janela_pesquisa_tipo = tk.Toplevel(self.root)
+        janela_pesquisa_tipo.title("Pesquisar por Tipo de Produto")
+        
+        # Frame para pesquisa
+        frame_pesquisa = ttk.Frame(janela_pesquisa_tipo, padding="10")
+        frame_pesquisa.grid(row=0, column=0)
+        
+        # Label e combobox para seleção do tipo de produto
+        ttk.Label(frame_pesquisa, text="Selecione o Tipo de Produto:").grid(row=0, column=0, padx=5, pady=5)
+        combo_tipo_produto = ttk.Combobox(frame_pesquisa, values=[
+            "ADESIVO BRILHO", "AMOSTRA", "ARAME MIRUNA", "BOIUI", "BOX ACRILICO", "BOX VOLVO",
+            "CAIXA", "CAIXA EXP M", "CAIXA G", "CAIXA G+", "CAIXA G", "CAIXA M", "CAIXA P",
+            "COUCHE BRILHO 115G 64X88", "COUCHE BRILHO 115G 66X96", "COUCHE BRILHO 150G 64X88",
+            "COUCHE BRILHO 150G 66X96", "COUCHE BRILHO 170G 64X88", "COUCHE BRILHO 210G 66X96",
+            "COUCHE BRILHO 250G 66X96", "COUCHE BRILHO 300G 66X96", "COUCHE BRILHO 90G 64X88",
+            "COUCHE FSC BRILHO 210G 66X96", "DUO DESIGN 300G 66X96", "DUPLEX 250G 77X113",
+            "DUPLEX 300G 66X96", "DVD BOX PRETO", "ECOPRESS 70G 64X96", "ENV BOLHA 19X25",
+            "ENVELOPE CD RECICLATO", "FICHARIO", "LAMINAS", "PAPEL CANARIO", "PAPEIS FSC",
+            "PASTA GBW", "RECICLATO 120G 66X96", "RECICLATO 180G 66X96", "RECICLATO 75G 64X88",
+            "RECICLATO 75G 66X96", "RECICLATO 75G 76X1120", "RECICLATO 90G 64X88", "RECICLATO 90G 66X96",
+            "SHIRINK", "SUPREMO 250G 66X96", "SUPREMO 250G 77X1130", "SUPREMO 300G 66X96", "SUPERB VERDE/ AMARELO"
+        ])
+        combo_tipo_produto.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Botão para realizar a pesquisa
+        botao_pesquisar = ttk.Button(frame_pesquisa, text="Pesquisar", command=lambda: self.pesquisar_tipo_produto(combo_tipo_produto.get(), janela_pesquisa_tipo))
+        botao_pesquisar.grid(row=0, column=2, padx=5, pady=5)
+        
+    def pesquisar_tipo_produto(self, tipo_produto, janela_pesquisa):
+        # Consultar banco de dados
+        cursor = self.conexao.execute("""
+            SELECT * FROM estoque
+            WHERE tipo = ?
+        """, (tipo_produto,))
+        
+        # Exibir resultado da pesquisa
+        janela_resultado = tk.Toplevel(janela_pesquisa)
+        janela_resultado.title("Resultado da Pesquisa")
+        
+        # Frame para o resultado
+        frame_resultado = ttk.Frame(janela_resultado, padding="10")
+        frame_resultado.grid(row=0, column=0)
+        
+        # Label para o resultado
+        ttk.Label(frame_resultado, text=f"Produtos do tipo '{tipo_produto}':").grid(row=0, column=0, columnspan=2, pady=5)
+        
+        # Lista de produtos
+        ttk.Label(frame_resultado, text="Lado").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(frame_resultado, text="Andar").grid(row=1, column=1, padx=5, pady=5)
+        ttk.Label(frame_resultado, text="Coluna").grid(row=1, column=2, padx=5, pady=5)
+        ttk.Label(frame_resultado, text="Vaga").grid(row=1, column=3, padx=5, pady=5)
+        ttk.Label(frame_resultado, text="Quantidade").grid(row=1, column=4, padx=5, pady=5)
+        ttk.Label(frame_resultado, text="Usuário").grid(row=1, column=5, padx=5, pady=5)
+        
+        # Preencher lista de produtos
+        linha = 2
+        for produto in cursor:
+            ttk.Label(frame_resultado, text=produto[1]).grid(row=linha, column=0)
+            ttk.Label(frame_resultado, text=produto[2]).grid(row=linha, column=1)
+            ttk.Label(frame_resultado, text=produto[3]).grid(row=linha, column=2)
+            ttk.Label(frame_resultado, text=produto[4]).grid(row=linha, column=3)
+            ttk.Label(frame_resultado, text=produto[6]).grid(row=linha, column=4)
+            ttk.Label(frame_resultado, text=produto[7]).grid(row=linha, column=5)
+            linha += 1
+
+# Iniciar a aplicação
+root = tk.Tk()
+app = EstoqueApp(root)
+root.mainloop()
